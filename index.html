@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Artifact Scanner</title>
+  <!--
+    Axiom: Artifact Scanner 1.0 face is four cards.
+      Storage · live roots
+      Sessions · live finder
+      Archive · cold shelves
+      Tools · bulk session management
+    Plextop / AyTree / rails are not 1.0 suite cards.
+    One suite window. Zip lives on the Sesefus frame.
+  -->
+  <style>
+    @font-face {
+      font-family: "OpenDyslexic3";
+      src: url("/fonts/OpenDyslexic3-Regular.ttf") format("truetype");
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: "OpenDyslexic3";
+      src: url("/fonts/OpenDyslexic3-Bold.ttf") format("truetype");
+      font-weight: 700; font-style: normal; font-display: swap;
+    }
+    :root {
+      --bg: #070b12;
+      --panel: #0c1826;
+      --line: #2a4a6a;
+      --text: #eef5ff;
+      --muted: #b4c6d8;
+      --accent: #7cf7ff;
+      --hot: #ff9b5e;
+      --ay: #c2a34a;
+      --plan: #c9a0ff;
+      --chrome-h: 34px;
+      --gap: 10px;
+      --card-r: 10px;
+      --slot-pad: 11px;
+      --zip-ease: 220ms cubic-bezier(0.22, 0.8, 0.28, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%;
+      background: var(--bg); color: var(--text);
+      font: 13px/1.45 "OpenDyslexic3", "Segoe UI", system-ui, sans-serif;
+      overflow: hidden;
+    }
+    #chrome {
+      height: var(--chrome-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--line);
+      background: #0a1018;
+      user-select: none;
+      gap: 10px;
+    }
+    .axiom {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .axiom b { color: var(--text); font-weight: 600; }
+    .actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+    .hotswap {
+      appearance: none;
+      border: 1px solid #5a3a22;
+      background: #1a120c;
+      color: var(--hot);
+      font: inherit;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .hotswap:hover { background: #2a1a10; border-color: var(--hot); }
+    .hotswap:disabled { opacity: 0.45; cursor: wait; }
+
+    #table {
+      height: calc(100% - var(--chrome-h));
+      width: 100%;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(200px, 1fr) 8px minmax(200px, 1fr);
+      grid-template-rows: minmax(160px, 1fr) 8px minmax(160px, 1fr);
+      gap: 0;
+      column-gap: 0;
+      padding: var(--gap);
+    }
+    .col-gutter {
+      width: 8px;
+      min-width: 8px;
+      cursor: col-resize;
+      align-self: stretch;
+      background: transparent;
+      position: relative;
+      z-index: 3;
+    }
+    .col-gutter::after {
+      content: "";
+      position: absolute;
+      inset: 12% 2px;
+      border-radius: 3px;
+      background: rgba(124, 247, 255, 0.18);
+    }
+    .col-gutter:hover::after, .col-gutter.drag::after {
+      background: rgba(124, 247, 255, 0.55);
+    }
+    .row-gutter {
+      grid-column: 1 / -1;
+      height: 8px;
+      min-height: 8px;
+      cursor: default;
+      position: relative;
+    }
+    .row-gutter::after {
+      content: "";
+      position: absolute;
+      inset: 2px 12%;
+      border-radius: 3px;
+      background: rgba(124, 247, 255, 0.18);
+    }
+
+    /* Slot = zip shadow + card. Shadow is decorative (no click), icon is. */
+    .card-slot {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      padding: var(--slot-pad);
+    }
+    .zip-shadow {
+      position: absolute;
+      inset: 3px;
+      border-radius: calc(var(--card-r) + 4px);
+      border: 1px solid rgba(94, 200, 255, 0.12);
+      background: rgba(8, 14, 22, 0.55);
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+        0 6px 18px rgba(0, 0, 0, 0.28);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.72;
+      transition:
+        border-color var(--zip-ease),
+        box-shadow var(--zip-ease),
+        opacity var(--zip-ease),
+        background-color var(--zip-ease);
+    }
+    .card-slot:hover .zip-shadow {
+      opacity: 1;
+      border-color: rgba(94, 200, 255, 0.28);
+      background: rgba(12, 20, 32, 0.72);
+      box-shadow:
+        inset 0 0 0 1px rgba(94, 200, 255, 0.06),
+        0 8px 22px rgba(0, 0, 0, 0.38);
+    }
+    .card-slot.is-unzipped .zip-shadow {
+      border-style: dashed;
+      border-color: rgba(255, 155, 94, 0.35);
+      opacity: 0.9;
+    }
+    .card-slot.is-unzipped:hover .zip-shadow {
+      border-color: rgba(255, 155, 94, 0.55);
+    }
+
+    /* Inlaid zipper — only hit target. Median vertical, countersunk in right border. */
+    .zip-inlay {
+      appearance: none;
+      position: absolute;
+      z-index: 3;
+      right: 1px;
+      top: 50%;
+      transform: translate(50%, -50%);
+      width: 18px;
+      height: 34px;
+      margin: 0;
+      padding: 0;
+      border-radius: 5px;
+      border: 1px solid rgba(94, 200, 255, 0.22);
+      background:
+        linear-gradient(180deg, rgba(18, 28, 40, 0.98), rgba(8, 14, 22, 0.98));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(0, 0, 0, 0.35);
+      color: var(--muted);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition:
+        color var(--zip-ease),
+        border-color var(--zip-ease),
+        box-shadow var(--zip-ease),
+        background-color var(--zip-ease),
+        transform var(--zip-ease);
+    }
+    .zip-inlay svg {
+      width: 11px;
+      height: 18px;
+      display: block;
+      pointer-events: none;
+    }
+    .card-slot:hover .zip-inlay {
+      color: var(--accent);
+      border-color: rgba(94, 200, 255, 0.45);
+    }
+    .zip-inlay:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(94, 200, 255, 0.15),
+        0 0 12px rgba(94, 200, 255, 0.12);
+    }
+    .zip-inlay:active {
+      transform: translate(50%, -50%) scale(0.96);
+    }
+    .zip-inlay:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .zip-inlay:disabled {
+      opacity: 0.45;
+      cursor: wait;
+    }
+    .card-slot.is-unzipped .zip-inlay {
+      color: var(--hot);
+      border-color: rgba(255, 155, 94, 0.45);
+    }
+    /* Zip off — unzipped only. Inlays stay in DOM for --suite debug, hidden. */
+    .zip-shadow, .zip-inlay { display: none !important; }
+    #hotswap { display: none !important; }
+    .card-slot.is-unzipped .zip-inlay:hover {
+      color: var(--hot);
+      border-color: var(--hot);
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border: 2px solid var(--line);
+      border-radius: var(--card-r);
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+      transition: opacity var(--zip-ease), filter var(--zip-ease);
+    }
+    .card-slot.is-unzipped .card {
+      opacity: 0.42;
+      filter: saturate(0.7);
+    }
+    .card-slot.is-unzipped .card-body::after {
+      content: "unzipped · OS windows open";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      background: rgba(7, 11, 18, 0.55);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+
+    .card-head {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #0a1018;
+    }
+    .slim-tap {
+      flex: 0 0 auto;
+      min-height: 26px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1.15;
+      border-radius: 7px;
+      color: var(--accent);
+      border: 1px solid rgba(124, 247, 255, 0.4);
+      background: rgba(61, 224, 255, 0.08);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .slim-tap:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .slim-tap[data-agent="grok"] { color: #7cf7ff; border-color: rgba(124, 247, 255, 0.55); }
+    .slim-tap[data-agent="claude"] { color: #ffb07a; border-color: rgba(255, 176, 122, 0.55); }
+    .slim-tap[data-agent="cursor"] { color: #c9a0ff; border-color: rgba(201, 160, 255, 0.55); }
+    .slim-3q { color: #d6f4ff; border-color: rgba(214, 244, 255, 0.55); font-weight: 800; }
+    .slim-3q:hover, .slim-3q.launching { color: #061018; background: var(--accent); border-color: var(--accent); }
+    .provider-pair { display: inline-flex; align-items: stretch; gap: 4px; flex: 0 0 auto; }
+    .slim-dbl {
+      flex: 0 0 auto;
+      min-height: 26px;
+      padding: 3px 7px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.15;
+      border-radius: 7px;
+      color: var(--muted, #8aa0b8);
+      border: 1px solid var(--line);
+      background: transparent;
+      white-space: nowrap;
+      cursor: pointer;
+      text-transform: lowercase;
+    }
+    .slim-dbl:hover { color: var(--text); border-color: rgba(124, 247, 255, 0.4); }
+    .face-logo {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+      cursor: pointer;
+    }
+    .face-logo .mark {
+      flex: 0 0 auto;
+      width: 1.55em;
+      height: 1.55em;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      border: 1px solid var(--line);
+      background: #0d1520;
+      color: var(--accent);
+    }
+    .face-logo .word {
+      min-width: 0;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .face-logo .tag {
+      flex: 0 1 auto;
+      min-width: 0;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-slot[data-card="storage"] .face-logo .mark,
+    .card-slot[data-card="sessions"] .face-logo .mark {
+      color: var(--accent);
+      border-color: #2a4a66;
+      background: #0d1826;
+    }
+    .card-slot[data-card="archive"] .face-logo .mark {
+      color: var(--ay);
+      border-color: #5a4a22;
+      background: #161208;
+    }
+    .card-slot[data-card="archive"] .face-logo .word { color: #e8d48a; }
+    .card-slot[data-card="tools"] .face-logo .mark {
+      color: var(--plan);
+      border-color: #4a3a66;
+      background: #140f1c;
+    }
+
+    .flip {
+      appearance: none;
+      border: 1px solid #2a4a66;
+      background: #0c1826;
+      color: var(--accent);
+      font: inherit;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 4px 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .flip:hover { border-color: var(--accent); }
+    .flip:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    .card-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+      background: #070b12;
+    }
+    .card-body iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #070b12;
+      display: none;
+    }
+    .card-body iframe.on { display: block; }
+
+    .card.flipping .card-body {
+      animation: cardflip 0.22s ease;
+    }
+    @keyframes cardflip {
+      0%   { transform: scaleX(1); opacity: 1; }
+      45%  { transform: scaleX(0.04); opacity: 0.4; }
+      100% { transform: scaleX(1); opacity: 1; }
+    }
+
+    @media (max-width: 900px) {
+      #table { grid-template-columns: 1fr; grid-template-rows: repeat(4, minmax(120px, 1fr)); }
+      .col-gutter, .row-gutter { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="chrome">
+    <div class="axiom" title="Four 1.0 cards. Zip lives on the Sesefus frame, not here.">
+      <b>one window</b> · storage · sessions · archive · tools
+    </div>
+    <div class="actions">
+      <button type="button" class="hotswap" id="hotswap" title="Unzip all cards (full dissolve)">
+        ↯ all
+      </button>
+    </div>
+  </div>
+
+  <div id="table" role="main">
+    <!-- Storage -->
+    <div class="card-slot" data-card="storage" data-zipped="1">
+      <div class="zip-shadow" aria-hidden="true"></div>
+      <button type="button" class="zip-inlay" data-zip title="Unzip Storage" aria-label="Unzip Storage card">
+        <svg viewBox="0 0 12 20" fill="none" aria-hidden="true">
+          <path d="M6 2v16" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M3 4.5h6M3 7h6M3 9.5h6M3 12h6M3 14.5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M4.2 2.2h3.6v2.2H4.2z" fill="currentColor" opacity="0.85"/>
+        </svg>
+      </button>
+      <section class="card" data-default-face="roots" aria-label="Storage card">
+        <div class="card-head">
+          <div class="face-logo" data-face-logo aria-live="polite">
+            <span class="mark" data-mark>▣</span>
+            <span class="word" data-word>Storage</span>
+            <span class="tag" data-tag>live roots</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <iframe title="Storage" data-face="roots" data-mark="▣" data-word="Storage" data-tag="live roots"
+            data-src="/storage?embedded=1"></iframe>
+        </div>
+      </section>
+    </div>
+    <div class="col-gutter" data-gutter="0" role="separator" aria-orientation="vertical" aria-label="Resize storage / sessions"></div>
+
+    <!-- Sessions -->
+    <div class="card-slot" data-card="sessions" data-zipped="1">
+      <div class="zip-shadow" aria-hidden="true"></div>
+      <button type="button" class="zip-inlay" data-zip title="Unzip Sessions" aria-label="Unzip Sessions card">
+        <svg viewBox="0 0 12 20" fill="none" aria-hidden="true">
+          <path d="M6 2v16" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M3 4.5h6M3 7h6M3 9.5h6M3 12h6M3 14.5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M4.2 2.2h3.6v2.2H4.2z" fill="currentColor" opacity="0.85"/>
+        </svg>
+      </button>
+      <section class="card" data-default-face="live" aria-label="Sessions card">
+        <div class="card-head">
+          <div class="face-logo" data-face-logo aria-live="polite">
+            <span class="mark" data-mark>◈</span>
+            <span class="word" data-word>Sessions</span>
+            <span class="tag" data-tag>live</span>
+          </div>
+          <span class="provider-pair" role="group" aria-label="Provider">
+            <button type="button" class="slim-tap" id="sessionsTap" data-agent="grok" title="Next provider. One tap.">Grok</button>
+            <button type="button" class="slim-dbl" id="sessionsDbl" title="doubler · previous provider · one tap">dclick</button>
+            <button type="button" class="slim-tap slim-3q" id="sessions3q" title="Open a session. First input: 3 q interview">3-Q</button>
+            <button type="button" class="slim-tap slim-3q" id="sessionsScanSes" title="Open a session. First input: /scan-sessions">scan-ses</button>
+          </span>
+        </div>
+        <div class="card-body">
+          <iframe title="Sessions" data-face="live" data-mark="◈" data-word="Sessions" data-tag="live"
+            data-src="/?mode=live&window=live&embedded=1"></iframe>
+        </div>
+      </section>
+    </div>
+    <div class="row-gutter" aria-hidden="true"></div>
+
+    <!-- Archive -->
+    <div class="card-slot" data-card="archive" data-zipped="1">
+      <div class="zip-shadow" aria-hidden="true"></div>
+      <button type="button" class="zip-inlay" data-zip title="Unzip Archive" aria-label="Unzip Archive card">
+        <svg viewBox="0 0 12 20" fill="none" aria-hidden="true">
+          <path d="M6 2v16" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M3 4.5h6M3 7h6M3 9.5h6M3 12h6M3 14.5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M4.2 2.2h3.6v2.2H4.2z" fill="currentColor" opacity="0.85"/>
+        </svg>
+      </button>
+      <section class="card" data-default-face="cold" aria-label="Archive card">
+        <div class="card-head">
+          <div class="face-logo" data-face-logo aria-live="polite">
+            <span class="mark" data-mark>▤</span>
+            <span class="word" data-word>Archive</span>
+            <span class="tag" data-tag>cold shelves</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <iframe title="Archive" data-face="cold" data-mark="▤" data-word="Archive" data-tag="cold shelves"
+            data-src="/?mode=archive&window=archive&embedded=1"></iframe>
+        </div>
+      </section>
+    </div>
+    <div class="col-gutter" data-gutter="0" role="separator" aria-orientation="vertical" aria-label="Resize archive / tools"></div>
+
+    <!-- Tools -->
+    <div class="card-slot" data-card="tools" data-zipped="1">
+      <div class="zip-shadow" aria-hidden="true"></div>
+      <button type="button" class="zip-inlay" data-zip title="Unzip Tools" aria-label="Unzip Tools card">
+        <svg viewBox="0 0 12 20" fill="none" aria-hidden="true">
+          <path d="M6 2v16" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M3 4.5h6M3 7h6M3 9.5h6M3 12h6M3 14.5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M4.2 2.2h3.6v2.2H4.2z" fill="currentColor" opacity="0.85"/>
+        </svg>
+      </button>
+      <section class="card" data-default-face="bulk" aria-label="Tools card">
+        <div class="card-head">
+          <div class="face-logo" data-face-logo aria-live="polite">
+            <span class="mark" data-mark>TL</span>
+            <span class="word" data-word>Tools</span>
+            <span class="tag" data-tag>bulk</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <iframe title="Tools" data-face="bulk" data-mark="TL" data-word="Tools" data-tag="bulk"
+            data-src="/tools?embedded=1"></iframe>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const FACE_STORE = "artifact-scanner-suite-faces";
+      const ZIP_STORE = "artifact-scanner-suite-card-zip";
+      // Card URL maps for browser fallback (no pywebview)
+      const CARD_URLS = {
+        storage: ["/storage"],
+        sessions: ["/?mode=live&window=live"],
+        archive: ["/?mode=archive&window=archive"],
+        tools: ["/tools"],
+      };
+
+      function loadJSON(key) {
+        try { return JSON.parse(localStorage.getItem(key) || "{}") || {}; }
+        catch (_) { return {}; }
+      }
+      function saveJSON(key, map) {
+        try { localStorage.setItem(key, JSON.stringify(map)); } catch (_) {}
+      }
+
+      function loadFaces() { return loadJSON(FACE_STORE); }
+      function saveFaces(map) { saveJSON(FACE_STORE, map); }
+      function loadZip() { return loadJSON(ZIP_STORE); }
+      function saveZip(map) { saveJSON(ZIP_STORE, map); }
+
+      function faceList(card) {
+        return Array.from(card.querySelectorAll(".card-body iframe")).map((f) => f.dataset.face);
+      }
+      function faceFrame(card, face) {
+        return card.querySelector('.card-body iframe[data-face="' + face + '"]');
+      }
+      function hydrate(iframe) {
+        if (!iframe || iframe.dataset.hydrated === "1") return;
+        if (iframe.dataset.src && !iframe.getAttribute("src")) {
+          iframe.src = iframe.dataset.src;
+        }
+        iframe.dataset.hydrated = "1";
+      }
+
+      function paintLogo(slot, card, face) {
+        const frame = faceFrame(card, face) || card.querySelector(".card-body iframe");
+        if (!frame) return;
+        const logo = card.querySelector("[data-face-logo]");
+        if (!logo) return;
+        const mark = logo.querySelector("[data-mark]");
+        const word = logo.querySelector("[data-word]");
+        const tag = logo.querySelector("[data-tag]");
+        if (mark) mark.textContent = frame.dataset.mark || "·";
+        if (word) word.textContent = frame.dataset.word || face;
+        if (tag) tag.textContent = frame.dataset.tag || "";
+        slot.dataset.activeFace = frame.dataset.face || face;
+        const flip = card.querySelector("[data-flip]");
+        if (flip) {
+          const faces = faceList(card);
+          const other = faces.find((f) => f !== frame.dataset.face) || faces[0];
+          const otherFr = faceFrame(card, other);
+          const a = frame.dataset.word || face;
+          const b = otherFr ? (otherFr.dataset.word || other) : "";
+          flip.title = b ? ("Flip " + a + " ↔ " + b) : "Flip";
+        }
+      }
+
+      function showFace(slot, card, face, animate) {
+        const frames = card.querySelectorAll(".card-body iframe");
+        let found = false;
+        frames.forEach((f) => {
+          const on = f.dataset.face === face;
+          f.classList.toggle("on", on);
+          if (on) {
+            found = true;
+            hydrate(f);
+          }
+        });
+        if (!found && frames[0]) {
+          face = frames[0].dataset.face;
+          frames[0].classList.add("on");
+          hydrate(frames[0]);
+        }
+        paintLogo(slot, card, face);
+        if (animate) {
+          card.classList.remove("flipping");
+          void card.offsetWidth;
+          card.classList.add("flipping");
+          setTimeout(() => card.classList.remove("flipping"), 240);
+        }
+        const map = loadFaces();
+        map[slot.dataset.card] = face;
+        saveFaces(map);
+      }
+
+      function otherFace(card, current) {
+        const faces = faceList(card);
+        if (faces.length < 2) return current;
+        const i = faces.indexOf(current);
+        return faces[(i < 0 ? 0 : i + 1) % faces.length];
+      }
+
+      function currentFace(card) {
+        const on = card.querySelector(".card-body iframe.on");
+        return on ? on.dataset.face : (card.dataset.defaultFace || faceList(card)[0] || null);
+      }
+
+      /** Paint zip state without jump — no open/close thrash, CSS transition only */
+      function setZipped(slot, zipped, { persist = true, quiet = false } = {}) {
+        const id = slot.dataset.card;
+        const was = slot.dataset.zipped !== "0";
+        if (was === zipped && quiet) {
+          // already correct — do nothing (anti-jump)
+        }
+        slot.dataset.zipped = zipped ? "1" : "0";
+        slot.classList.toggle("is-unzipped", !zipped);
+        const btn = slot.querySelector("[data-zip]");
+        if (btn) {
+          const label = zipped
+            ? "Unzip " + id + " to OS windows"
+            : "Zip " + id + " back into suite pack";
+          btn.title = label;
+          btn.setAttribute("aria-label", label);
+          btn.setAttribute("aria-pressed", zipped ? "false" : "true");
+        }
+        if (persist) {
+          const map = loadZip();
+          map[id] = zipped ? "zipped" : "unzipped";
+          saveZip(map);
+        }
+      }
+
+      async function toggleZip(slot) {
+        // Zip off — unzipped only. Never re-stitch into the pack.
+        return;
+      }
+
+      const facesSaved = loadFaces();
+      if (facesSaved.rails || facesSaved.aytree || facesSaved.plextop || facesSaved.scanner) {
+        delete facesSaved.rails;
+        delete facesSaved.aytree;
+        delete facesSaved.plextop;
+        delete facesSaved.scanner;
+        saveFaces(facesSaved);
+      }
+      let zipSaved = loadZip();
+
+      (function wireScannerTap() {
+        const btn = document.getElementById("sessionsTap");
+        const dbl = document.getElementById("sessionsDbl");
+        if (!btn && !dbl) return;
+        function scannerSlot() {
+          return document.querySelector('.card-slot[data-card="sessions"]');
+        }
+        function send(act) {
+          const slot = scannerSlot();
+          if (!slot) return;
+          slot.querySelectorAll(".card-body iframe").forEach((frame) => {
+            if (!frame.contentWindow) return;
+            try { frame.contentWindow.postMessage({ source: "as-suite", act: act }, "*"); } catch (_) {}
+          });
+        }
+        function paintProvider(agent, label) {
+          if (!btn) return;
+          const a = agent || "grok";
+          btn.dataset.agent = a;
+          btn.textContent = label || ({ grok: "Grok", claude: "Claude", cursor: "Cursor" }[a] || a);
+        }
+        if (btn) {
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            send("tap");
+          });
+        }
+        if (dbl) {
+          dbl.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            send("dbl");
+          });
+        }
+        const q3 = document.getElementById("sessions3q");
+        if (q3) {
+          q3.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const agent = (btn && btn.dataset.agent) || "grok";
+            q3.classList.add("launching");
+            try {
+              const r = await fetch("/api/launch-agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  agent: agent,
+                  cwd: "C:\\Users\\bardw\\jwrangle",
+                  input: "3 q interview",
+                }),
+              });
+              const j = await r.json().catch(() => ({}));
+              q3.title = (j && j.ok)
+                ? ("opened · 3 q interview → " + (j.cwd || ""))
+                : ((j && j.error) || "3-Q launch failed");
+              if (!j || !j.ok) q3.classList.add("failed");
+            } catch (err) {
+              q3.title = String(err);
+              q3.classList.add("failed");
+            }
+            q3.classList.remove("launching");
+          });
+        }
+        const scanSes = document.getElementById("sessionsScanSes");
+        if (scanSes) {
+          scanSes.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const agent = (btn && btn.dataset.agent) || "grok";
+            scanSes.classList.add("launching");
+            try {
+              const r = await fetch("/api/launch-agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  agent: agent,
+                  cwd: "C:\\Users\\bardw\\jwrangle",
+                  input: "/scan-sessions",
+                }),
+              });
+              const j = await r.json().catch(() => ({}));
+              scanSes.title = (j && j.ok)
+                ? ("opened · /scan-sessions → " + (j.cwd || ""))
+                : ((j && j.error) || "scan-ses launch failed");
+              if (!j || !j.ok) scanSes.classList.add("failed");
+            } catch (err) {
+              scanSes.title = String(err);
+              scanSes.classList.add("failed");
+            }
+            scanSes.classList.remove("launching");
+          });
+        }
+        window.addEventListener("message", (ev) => {
+          const d = ev && ev.data;
+          if (!d || d.source !== "as-board") return;
+          paintProvider(d.agent, d.label);
+        });
+        const logo = document.querySelector('.card-slot[data-card="sessions"] [data-face-logo]');
+        if (logo) logo.title = "Live sessions";
+      })();
+
+      function paintZipVisual() {
+        document.querySelectorAll(".card-slot").forEach((slot) => {
+          const id = slot.dataset.card;
+          const hostCard = zipSaved[id];
+          let zipped = true;
+          if (hostCard && typeof hostCard === "object" && "zipped" in hostCard) {
+            zipped = hostCard.zipped !== false;
+          } else {
+            zipped = hostCard !== "unzipped";
+          }
+          setZipped(slot, zipped, { persist: false, quiet: true });
+        });
+      }
+
+      document.querySelectorAll(".card-slot").forEach((slot) => {
+        const card = slot.querySelector(".card");
+        if (!card) return;
+        const id = slot.dataset.card;
+        const initial = facesSaved[id] || card.dataset.defaultFace || faceList(card)[0];
+        showFace(slot, card, initial, false);
+
+        // Visual from last page store; host layout file wins when the bridge is up.
+        const z = zipSaved[id];
+        const zipped = (z && typeof z === "object") ? z.zipped !== false : z !== "unzipped";
+        setZipped(slot, zipped, { persist: false, quiet: true });
+
+        card.querySelectorAll("[data-flip]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            showFace(slot, card, otherFace(card, currentFace(card)), true);
+          });
+        });
+        const zipBtn = slot.querySelector("[data-zip]");
+        if (zipBtn) {
+          zipBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleZip(slot);
+          });
+        }
+      });
+
+      (async function preferHostLayout() {
+        try {
+          const api = window.pywebview && window.pywebview.api;
+          if (!api || !api.suite_layout) return;
+          const r = await api.suite_layout();
+          if (!r || r.ok === false || !r.cards) return;
+          zipSaved = r.cards;
+          paintZipVisual();
+        } catch (_) {}
+      })();
+
+      document.addEventListener("keydown", (e) => {
+        if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+        const slots = Array.from(document.querySelectorAll(".card-slot"));
+        const cards = slots.map((s) => s.querySelector(".card")).filter(Boolean);
+        if (e.key === "f" || e.key === "F") {
+          const hovered = document.querySelector(".card-slot:hover");
+          const slot = hovered || slots[0] || null;
+          if (!slot) return;
+          const card = slot.querySelector(".card");
+          if (card && faceList(card).length > 1) {
+            showFace(slot, card, otherFace(card, currentFace(card)), true);
+          }
+        }
+        [1, 2, 3, 4].forEach((n) => {
+          if (e.key === String(n) && slots[n - 1] && cards[n - 1]) {
+            const slot = slots[n - 1];
+            const card = cards[n - 1];
+            if (faceList(card).length > 1) {
+              showFace(slot, card, otherFace(card, currentFace(card)), true);
+            }
+          }
+        });
+      });
+
+      (function wireColResize() {
+        const table = document.getElementById("table");
+        const KEY = "artifact-scanner-suite-cols-v2";
+        const MIN = [200, 200];
+        function loadRatios() {
+          try {
+            const j = JSON.parse(localStorage.getItem(KEY) || "null");
+            if (Array.isArray(j) && j.length === 2 && j.every((n) => n > 0)) return j;
+          } catch (_) {}
+          return [0.5, 0.5];
+        }
+        function saveRatios(r) {
+          try { localStorage.setItem(KEY, JSON.stringify(r)); } catch (_) {}
+        }
+        function paint(r) {
+          const pad = 20;
+          const gut = 8;
+          const inner = Math.max(400, table.clientWidth - pad);
+          const usable = Math.max(300, inner - gut);
+          const sum = r[0] + r[1];
+          let px = r.map((n) => Math.floor(usable * n / sum));
+          MIN.forEach((m, i) => { if (px[i] < m) px[i] = m; });
+          const over = px[0] + px[1] - usable;
+          if (over > 0) {
+            const grow = px.map((v, i) => v - MIN[i]);
+            const gsum = grow[0] + grow[1] || 1;
+            px = px.map((v, i) => Math.max(MIN[i], v - Math.round(over * grow[i] / gsum)));
+          }
+          table.style.gridTemplateColumns = px[0] + "px 8px " + px[1] + "px";
+          table.style.gridTemplateRows = "minmax(160px,1fr) 8px minmax(160px,1fr)";
+          return px;
+        }
+        let ratios = loadRatios();
+        paint(ratios);
+        window.addEventListener("resize", () => paint(ratios));
+        table.querySelectorAll(".col-gutter").forEach((g) => {
+          g.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            const idx = parseInt(g.getAttribute("data-gutter") || "0", 10);
+            const startX = e.clientX;
+            const start = ratios.slice();
+            const inner = Math.max(400, table.clientWidth - 20);
+            const usable = Math.max(300, inner - 16);
+            g.classList.add("drag");
+            g.setPointerCapture(e.pointerId);
+            function move(ev) {
+              const dx = ev.clientX - startX;
+              const d = dx / usable;
+              const a = start[idx];
+              const b = start[idx + 1];
+              let na = a + d;
+              let nb = b - d;
+              const minA = MIN[idx] / usable;
+              const minB = MIN[idx + 1] / usable;
+              if (na < minA) { nb -= (minA - na); na = minA; }
+              if (nb < minB) { na -= (minB - nb); nb = minB; }
+              ratios = start.slice();
+              ratios[idx] = na;
+              ratios[idx + 1] = nb;
+              paint(ratios);
+            }
+            function up() {
+              g.classList.remove("drag");
+              g.removeEventListener("pointermove", move);
+              g.removeEventListener("pointerup", up);
+              saveRatios(ratios);
+            }
+            g.addEventListener("pointermove", move);
+            g.addEventListener("pointerup", up);
+          });
+        });
+      })();
+
+      const hotswap = document.getElementById("hotswap");
+      hotswap.addEventListener("click", async () => {
+        hotswap.disabled = true;
+        try {
+          if (window.pywebview && window.pywebview.api && window.pywebview.api.suite_hotswap) {
+            const r = await window.pywebview.api.suite_hotswap();
+            if (r && r.ok === false) console.warn(r.error || r);
+            // mark all unzipped visually if dissolve succeeded
+            if (!r || r.ok !== false) {
+              document.querySelectorAll(".card-slot").forEach((s) => setZipped(s, false));
+            }
+            return;
+          }
+          Object.values(CARD_URLS).flat().forEach((u) => window.open(u, "_blank"));
+          document.querySelectorAll(".card-slot").forEach((s) => setZipped(s, false));
+        } catch (err) {
+          console.warn(err);
+        } finally {
+          hotswap.disabled = false;
+        }
+      });
+    })();
+  </script>
+  <script src="/suite-zip.js?v=9"></script>
+</body>
+</html>
